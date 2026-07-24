@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="openqpcr">
+  <!--
+    Placeholder application icon for openqpcr (qPCR reader/viewer).
+    This SVG is the source of truth; assets/icon-1024.png is the committed
+    1024px master rendered from it. Replace with a real icon when available.
+    Motif: a qPCR amplification (sigmoid) curve crossing a dashed Cq threshold.
+  -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16B98A"/>
+      <stop offset="1" stop-color="#0B7150"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="0.3" cy="0.16" r="0.7">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.20"/>
+      <stop offset="0.6" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="0" y="0" width="100" height="100" rx="22.5" fill="url(#bg)"/>
+  <rect x="0" y="0" width="100" height="100" rx="22.5" fill="url(#sheen)"/>
+  <!-- Cq threshold line -->
+  <line x1="14" y1="58" x2="86" y2="58" stroke="#FCFEFF" stroke-opacity="0.35"
+        stroke-width="2" stroke-dasharray="4 4"/>
+  <!-- Amplification sigmoid -->
+  <path d="M14 80 C 40 80, 44 79, 52 50 C 58 28, 64 23, 86 21"
+        fill="none" stroke="#FCFEFF" stroke-width="6.2"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Cross-over marker where the curve meets the threshold -->
+  <circle cx="50.5" cy="58" r="3.4" fill="#FCFEFF"/>
+</svg>

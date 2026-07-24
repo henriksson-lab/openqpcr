@@ -1,0 +1,77 @@
+import { Theme } from "theme.slint";
+import { TableRow, InfoRow } from "types.slint";
+import { ListView } from "std-widgets.slint";
+
+// CFX-style data spreadsheet: bold grey header with sort glyphs, white rows with
+// 1px gridlines, blue highlight on the selected row.
+export component DataTable inherits Rectangle {
+    in property <string> value-header: "Cq";
+    in property <[TableRow]> rows;
+    callback row-clicked(string);
+
+    background: Theme.panel-bg;
+    border-color: Theme.border;
+    border-width: 1px;
+
+    property <length> c-well: 42px;
+    property <length> c-fluor: 66px;
+    property <length> c-content: 60px;
+    property <length> c-value: 62px;
+
+    VerticalLayout {
+        // header
+        Rectangle {
+            height: 20px;
+            background: Theme.table-header-bg;
+            border-color: Theme.border;
+            border-width: 1px;
+            HorizontalLayout {
+                padding-left: 4px;
+                spacing: 0px;
+                Text { width: c-well; text: "Well ◇"; font-weight: 700; font-size: Theme.font-size-small; color: Theme.text; vertical-alignment: center; }
+                Text { width: c-fluor; text: "Fluor ◇"; font-weight: 700; font-size: Theme.font-size-small; color: Theme.text; vertical-alignment: center; }
+                Text { width: c-content; text: "Content"; font-weight: 700; font-size: Theme.font-size-small; color: Theme.text; vertical-alignment: center; }
+                Text { horizontal-stretch: 1; text: "Sample"; font-weight: 700; font-size: Theme.font-size-small; color: Theme.text; vertical-alignment: center; }
+                Text { width: c-value; text: root.value-header + " ◇"; font-weight: 700; font-size: Theme.font-size-small; color: Theme.text; vertical-alignment: center; }
+            }
+        }
+        // rows
+        ListView {
+            for r in root.rows : Rectangle {
+                height: 18px;
+                background: r.selected ? Theme.row-selected-bg : Theme.panel-bg;
+                Rectangle { y: parent.height - 1px; height: 1px; background: Theme.table-gridline; }
+                TouchArea { clicked => { root.row-clicked(r.well); } }
+                HorizontalLayout {
+                    padding-left: 4px;
+                    Text { width: c-well; text: r.well; font-size: Theme.font-size-small; color: Theme.text; vertical-alignment: center; }
+                    Text { width: c-fluor; text: r.fluor; font-size: Theme.font-size-small; color: Theme.text; vertical-alignment: center; }
+                    Text { width: c-content; text: r.content; font-size: Theme.font-size-small; color: Theme.text; vertical-alignment: center; }
+                    Text { horizontal-stretch: 1; text: r.sample; font-size: Theme.font-size-small; color: Theme.text; vertical-alignment: center; }
+                    Text { width: c-value; text: r.value; font-size: Theme.font-size-small; color: Theme.text; vertical-alignment: center; }
+                }
+            }
+        }
+    }
+}
+
+// Simple key/value table for the Run Information tab.
+export component InfoTable inherits Rectangle {
+    in property <[InfoRow]> rows;
+    background: Theme.panel-bg;
+    border-color: Theme.border;
+    border-width: 1px;
+
+    ListView {
+        for r in root.rows : Rectangle {
+            height: 22px;
+            background: Theme.panel-bg;
+            Rectangle { y: parent.height - 1px; height: 1px; background: Theme.table-gridline; }
+            HorizontalLayout {
+                padding-left: 8px;
+                Text { width: 180px; text: r.key; font-weight: 700; font-size: Theme.font-size; color: Theme.text; vertical-alignment: center; }
+                Text { horizontal-stretch: 1; text: r.value; font-size: Theme.font-size; color: Theme.text; vertical-alignment: center; }
+            }
+        }
+    }
+}

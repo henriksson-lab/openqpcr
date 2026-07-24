@@ -1,0 +1,15 @@
+/target
+
+# Packaged macOS app/dmg output (see scripts/build-macos-app.sh) — not committed.
+dist/
+
+# Local real instrument files can contain experimental/proprietary data.
+samples/*
+!samples/.gitkeep
+
+# Local scratch/working area — screenshots, throwaway scripts, wordlists, etc.
+# Never commit (may contain real data or large downloads).
+/scratchpad/
+
+# Any locally-recreated derived reference data (kept outside the repo). Never commit.
+/reference-data/

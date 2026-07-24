@@ -1,0 +1,23 @@
+[package]
+name = "openqpcr-gui"
+version = "0.1.0"
+edition = "2024"
+description = "Slint GUI for openqpcr, modeled on Bio-Rad CFX Maestro"
+license = "MIT"
+repository = "https://github.com/henriksson-lab/openqpcr"
+homepage = "https://github.com/henriksson-lab/openqpcr"
+
+[[bin]]
+name = "openqpcr-gui"
+path = "src/main.rs"
+
+[dependencies]
+openqpcr = { path = ".." }
+slint = "1.17"
+anyhow = "1"
+image = { version = "0.25", default-features = false, features = ["png"] }
+serde_json = "1"
+rfd = "0.15"
+
+[build-dependencies]
+slint-build = "1.17"

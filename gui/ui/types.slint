@@ -1,0 +1,48 @@
+// Shared struct definitions passed from Rust into the UI.
+
+// A single polyline in a chart. `commands` is an SVG path string expressed in a
+// fixed 0..1000 x 0..1000 viewbox (Y already flipped so 0 = top), built in Rust.
+export struct TraceData {
+    color: brush,
+    commands: string,
+}
+
+// An axis gridline + label. `pos` is a fraction 0..1 along the axis.
+export struct AxisLabel {
+    pos: float,
+    text: string,
+}
+
+// One cell of the plate well-selector.
+export struct WellCell {
+    row: int,
+    col: int,
+    label: string,      // "A1"
+    content: string,    // "Unk" / "Std" / "NTC" ...
+    fill: brush,
+    occupied: bool,
+    selected: bool,
+}
+
+// One row of a data spreadsheet (Quantification / Melt tabs).
+export struct TableRow {
+    well: string,
+    fluor: string,
+    content: string,
+    sample: string,
+    value: string,      // Cq (Quantification) or Melt Temp
+    selected: bool,
+}
+
+// One key/value row for the Run Information tab.
+export struct InfoRow {
+    key: string,
+    value: string,
+}
+
+// One step of the thermal-protocol editor's step table.
+export struct ProtocolRow {
+    index: int,       // 0-based position in the program
+    kind: string,     // "Hold" / "Cycle" / "Melt" / ...
+    summary: string,  // human-readable one-line description
+}

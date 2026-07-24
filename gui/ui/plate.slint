@@ -1,0 +1,110 @@
+import { Theme } from "theme.slint";
+import { WellCell } from "types.slint";
+
+// The CFX well selector: row headers A–H, column headers 1–12 (auto-scales to
+// 384), wells tinted by sample type, content code centred, blue border when
+// selected. Supports click-drag selection: pressing a well emits `well-pressed`,
+// dragging over further wells emits `well-dragged`, and release emits
+// `well-released`. Rust decides select-vs-deselect from the first pressed well.
+export component PlateGrid inherits Rectangle {
+    in property <int> plate-rows: 8;
+    in property <int> plate-cols: 12;
+    in property <[WellCell]> wells;
+    in property <[string]> x-headers;
+    in property <[string]> y-headers;
+    callback well-pressed(int, int);
+    callback well-dragged(int, int);
+    callback well-released();
+
+    background: Theme.panel-bg;
+    border-color: Theme.border;
+    border-width: 1px;
+
+    property <length> header-w: 18px;
+    property <length> header-h: 16px;
+    property <length> cell-w: (self.width - header-w - 4px) / plate-cols;
+    property <length> cell-h: (self.height - header-h - 4px) / plate-rows;
+
+    // column headers (1..N)
+    for h[i] in x-headers : Text {
+        x: 2px + header-w + i * cell-w;
+        y: 2px;
+        width: cell-w;
+        height: header-h;
+        text: h;
+        font-family: Theme.font-family;
+        font-size: 9px;
+        color: Theme.text-muted;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    // row headers (A..)
+    for h[i] in y-headers : Text {
+        x: 2px;
+        y: 2px + header-h + i * cell-h;
+        width: header-w;
+        height: cell-h;
+        text: h;
+        font-family: Theme.font-family;
+        font-size: 9px;
+        color: Theme.text-muted;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+    // wells (display only; input is handled by the drag overlay below)
+    for w in wells : Rectangle {
+        x: 2px + header-w + w.col * cell-w;
+        y: 2px + header-h + w.row * cell-h;
+        width: cell-w - 1px;
+        height: cell-h - 1px;
+        background: w.fill;
+        border-color: w.selected ? Theme.well-selected-border : Theme.border;
+        border-width: w.selected ? 2px : 1px;
+        border-radius: 1px;
+
+        Text {
+            text: w.content;
+            font-family: Theme.font-family;
+            font-size: 8px;
+            color: Theme.text;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+
+    // Single overlay over the wells region: converts pointer position to a
+    // (row, col) and drives press / drag / release so a click-hold-move paints a
+    // whole range without repeated clicking.
+    TouchArea {
+        x: 2px + header-w;
+        y: 2px + header-h;
+        width: cell-w * plate-cols;
+        height: cell-h * plate-rows;
+
+        // Well currently under the pointer, clamped to the grid.
+        property <int> hover-col: clamp(floor(self.mouse-x / cell-w), 0, plate-cols - 1);
+        property <int> hover-row: clamp(floor(self.mouse-y / cell-h), 0, plate-rows - 1);
+        // Last cell we emitted for, so a drag fires once per cell, not per pixel.
+        property <int> last-row: -1;
+        property <int> last-col: -1;
+
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down) {
+                self.last-row = self.hover-row;
+                self.last-col = self.hover-col;
+                root.well-pressed(self.hover-row, self.hover-col);
+            } else if (event.kind == PointerEventKind.up) {
+                self.last-row = -1;
+                self.last-col = -1;
+                root.well-released();
+            }
+        }
+        moved => {
+            if (self.pressed && (self.hover-row != self.last-row || self.hover-col != self.last-col)) {
+                self.last-row = self.hover-row;
+                self.last-col = self.hover-col;
+                root.well-dragged(self.hover-row, self.hover-col);
+            }
+        }
+    }
+}

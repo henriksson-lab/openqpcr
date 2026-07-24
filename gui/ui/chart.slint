@@ -1,0 +1,151 @@
+import { Theme } from "theme.slint";
+import { TraceData, AxisLabel } from "types.slint";
+
+// A white line-chart panel in the CFX style: centred bold title with a small
+// muted reset glyph, a boxed plot area with light gridlines, axis tick labels,
+// and an optional coloured threshold line.
+export component LineChart inherits Rectangle {
+    in property <string> title;
+    in property <string> y-axis-title;      // drawn in the left gutter
+    in property <[TraceData]> traces;
+    in property <[AxisLabel]> x-labels;      // pos = fraction along X (0=left)
+    in property <[AxisLabel]> y-labels;      // pos = fraction from top (0=top)
+    in property <float> threshold-pos: -1;   // fraction from top; <0 hides it
+    in property <string> threshold-label;
+    in property <color> threshold-color: Theme.threshold;
+
+    background: Theme.panel-bg;
+    border-color: Theme.border;
+    border-width: 1px;
+
+    VerticalLayout {
+        padding: 0;
+
+        // Title strip
+        Rectangle {
+            height: 22px;
+            background: Theme.toolbar-bg;
+            border-color: Theme.border;
+            border-width: 1px;
+            Text {
+                text: root.title;
+                font-family: Theme.font-family;
+                font-size: Theme.font-size;
+                font-weight: 700;
+                color: Theme.text;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            // reset-view glyph (top-right)
+            Rectangle {
+                x: parent.width - 20px;
+                width: 14px; height: 14px;
+                Text { text: "⟳"; color: Theme.text-muted; font-size: 13px; }
+            }
+        }
+
+        // Plot region: [y-title][y-labels][plot]/[x-labels]
+        HorizontalLayout {
+            padding: 4px;
+            spacing: 2px;
+
+            // Y axis title
+            Rectangle {
+                width: 58px;
+                clip: true;
+                Text {
+                    x: 0;
+                    y: parent.height / 2 - self.preferred-height / 2;
+                    width: parent.width;
+                    height: parent.width;
+                    text: root.y-axis-title;
+                    font-family: Theme.font-family;
+                    font-size: Theme.font-size-small;
+                    color: Theme.text-muted;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            // Y tick labels
+            Rectangle {
+                width: 34px;
+                for lbl in root.y-labels : Text {
+                    y: lbl.pos * (parent.height - 14px);
+                    x: 0;
+                    width: parent.width;
+                    text: lbl.text;
+                    font-family: Theme.font-family;
+                    font-size: 9px;
+                    color: Theme.text-muted;
+                    horizontal-alignment: right;
+                }
+            }
+
+            VerticalLayout {
+                // Plot canvas
+                plot := Rectangle {
+                    background: Theme.plot-bg;
+                    border-color: Theme.plot-axis;
+                    border-width: 1px;
+                    clip: true;
+
+                    // horizontal gridlines
+                    for lbl in root.y-labels : Rectangle {
+                        y: lbl.pos * parent.height;
+                        x: 0; width: parent.width; height: 1px;
+                        background: Theme.plot-grid;
+                    }
+                    // vertical gridlines
+                    for lbl in root.x-labels : Rectangle {
+                        x: lbl.pos * parent.width;
+                        y: 0; width: 1px; height: parent.height;
+                        background: Theme.plot-grid;
+                    }
+
+                    // data traces
+                    for t in root.traces : Path {
+                        x: 0; y: 0;
+                        width: parent.width;
+                        height: parent.height;
+                        viewbox-x: 0;
+                        viewbox-y: 0;
+                        viewbox-width: 1000;
+                        viewbox-height: 1000;
+                        commands: t.commands;
+                        stroke: t.color;
+                        stroke-width: 1.3px;
+                        fill: transparent;
+                    }
+
+                    // threshold line
+                    if root.threshold-pos >= 0 : Rectangle {
+                        y: root.threshold-pos * parent.height;
+                        x: 0; width: parent.width; height: 1px;
+                        background: root.threshold-color;
+                        Text {
+                            x: 4px; y: -12px;
+                            text: root.threshold-label;
+                            font-size: 9px;
+                            color: root.threshold-color;
+                        }
+                    }
+                }
+
+                // X tick labels
+                Rectangle {
+                    height: 14px;
+                    for lbl in root.x-labels : Text {
+                        x: lbl.pos * parent.width - 12px;
+                        width: 24px;
+                        text: lbl.text;
+                        font-family: Theme.font-family;
+                        font-size: 9px;
+                        color: Theme.text-muted;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}

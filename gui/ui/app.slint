@@ -1,0 +1,787 @@
+import { Theme } from "theme.slint";
+import { TraceData, AxisLabel, WellCell, TableRow, InfoRow, ProtocolRow } from "types.slint";
+import { LineChart } from "chart.slint";
+import { PlateGrid } from "plate.slint";
+import { DataTable, InfoTable } from "table.slint";
+import { CheckBox, ComboBox, LineEdit, Button } from "std-widgets.slint";
+
+export { TraceData, AxisLabel, WellCell, TableRow, InfoRow }
+
+export component AppWindow inherits Window {
+    title: "Data Analysis - " + root.file-name;
+    preferred-width: 1120px;
+    preferred-height: 740px;
+    background: Theme.window-bg;
+    default-font-family: Theme.font-family;
+    default-font-size: Theme.font-size;
+
+    // ---- data in from Rust ----
+    in property <string> file-name: "(no file)";
+    in property <string> app-version: "0.1.0";
+    in-out property <int> current-tab: 0;
+    in-out property <bool> about-visible: false;
+    in property <bool> log-scale: true;
+    in property <bool> stable-axes: true;
+
+    in property <[TraceData]> amp-traces;
+    in property <[AxisLabel]> amp-x-labels;
+    in property <[AxisLabel]> amp-y-labels;
+    in property <float> amp-threshold-pos: -1;
+    in property <string> amp-threshold-label;
+
+    in property <[TraceData]> melt-traces;
+    in property <[AxisLabel]> melt-x-labels;
+    in property <[AxisLabel]> melt-y-labels;
+    in property <[TraceData]> peak-traces;
+    in property <[AxisLabel]> peak-x-labels;
+    in property <[AxisLabel]> peak-y-labels;
+
+    in property <int> plate-rows: 8;
+    in property <int> plate-cols: 12;
+    in property <[WellCell]> wells;
+    in property <[string]> plate-x-headers;
+    in property <[string]> plate-y-headers;
+
+    in property <[TableRow]> quant-rows;
+    in property <[TableRow]> melt-rows;
+    in property <[InfoRow]> info-rows;
+
+    in property <string> std-curve-text: "No wells designated as Sample Type standard.";
+    in property <[TraceData]> stdcurve-traces;
+    in property <[AxisLabel]> stdcurve-x-labels;
+    in property <[AxisLabel]> stdcurve-y-labels;
+    in property <string> status-state: "Completed";
+    in property <string> status-scan-mode: "All Channels";
+    in property <string> status-plate-type: "Unknown";
+    in property <string> status-analysis-mode: "Baseline Subtracted Curve Fit";
+
+    // ---- analysis tabs (Gene Expression / Allelic Discrim. / QC) ----
+    // Gene expression: TableRow reused — fluor=target, content=mean Cq, sample=sample, value=rel expr.
+    in property <[TableRow]> gene-rows;
+    in property <string> gene-ref-label: "No targets with Cq available.";
+    // Allelic discrimination: a coloured end-point scatter plus a compact table.
+    in property <[TraceData]> allelic-traces;
+    in property <[AxisLabel]> allelic-x-labels;
+    in property <[AxisLabel]> allelic-y-labels;
+    in property <string> allelic-x-title: "Allele 1";
+    in property <string> allelic-y-title: "Allele 2";
+    // Allelic table: well=well, fluor=call, content=X RFU, value=Y RFU.
+    in property <[TableRow]> allelic-rows;
+    in property <string> allelic-label: "Needs two fluorophores.";
+    // QC: key/value metrics.
+    in property <[InfoRow]> qc-rows;
+
+    // ---- fluorophore filter (toolbar dropdown) ----
+    // Options are ["All Channels", <fluor>…]; "All Channels" clears the filter.
+    in property <[string]> fluor-options: ["All Channels"];
+    in-out property <int> current-fluor-index: 0;
+
+    // ---- callbacks out to Rust ----
+    callback toggle-log(bool);
+    callback toggle-stable-axes(bool);
+    callback fluor-selected(string);
+    callback well-pressed(int, int);
+    callback well-dragged(int, int);
+    callback well-released();
+    callback tab-selected(int);
+    callback quant-row-clicked(string);
+    callback request-export();
+    callback request-export-rdml();
+    callback request-export-csv();
+    callback request-quit();
+    // Instrument control: run a synthetic acquisition on the SimulatedInstrument.
+    callback request-simulate();
+    callback request-abort();
+    callback load-protocol(int);
+    in property <bool> run-active: false;
+
+    // ---- plate editor ----
+    in-out property <bool> plate-editor-visible: false;
+    in property <int> edit-sel-count: 0;
+    in property <int> edit-sample-type-index: 0;
+    in property <string> edit-sample-name;
+    in property <string> edit-start-qty;
+    in property <string> edit-status;
+    property <[string]> sample-type-names: ["Unknown", "Standard", "NTC", "NRT", "Pos Ctrl", "Neg Ctrl", "Empty"];
+    callback editor-open();
+    callback editor-close();
+    callback edit-apply-type(int);
+    callback edit-apply-name(string);
+    callback edit-apply-sq(string);
+    callback edit-clear();
+    callback editor-undo();
+    callback editor-save();
+    callback new-from-layout();
+    callback copy-layout-from();
+    callback save-layout-template();
+
+    // ---- Thermal-protocol editor ----
+    in-out property <bool> protocol-editor-visible: false;
+    in property <[ProtocolRow]> protocol-rows;
+    in property <string> protocol-status;
+    callback protocol-editor-open();
+    callback protocol-editor-close();
+    callback protocol-add-hold();
+    callback protocol-add-cycle();
+    callback protocol-add-melt();
+    callback protocol-remove(int);
+    callback protocol-move(int, int); // from, to
+    callback protocol-save();
+
+    property <[string]> tab-names: ["Quantification", "Melt Curve", "Run Information", "Gene Expression", "Allelic Discrim.", "QC"];
+
+    // Native menu bar (rendered in the macOS system menu bar; drawn in-window on
+    // other platforms). Only menus with real actions are listed — no empty stubs.
+    MenuBar {
+        Menu {
+            title: "File";
+            MenuItem {
+                title: "Export Run as JSON…";
+                activated => { root.request-export(); }
+            }
+            MenuItem {
+                title: "Export Run as RDML…";
+                activated => { root.request-export-rdml(); }
+            }
+            MenuItem {
+                title: "Export Run as CSV…";
+                activated => { root.request-export-csv(); }
+            }
+            MenuSeparator {}
+            MenuItem {
+                title: "New Plate from This Layout";
+                activated => { root.new-from-layout(); }
+            }
+            MenuItem {
+                title: "Copy Plate Layout From…";
+                activated => { root.copy-layout-from(); }
+            }
+            MenuItem {
+                title: "Save Layout Template…";
+                activated => { root.save-layout-template(); }
+            }
+            MenuSeparator {}
+            MenuItem {
+                title: "Quit";
+                activated => { root.request-quit(); }
+            }
+        }
+        Menu {
+            title: "Run";
+            Menu {
+                title: "Load Protocol";
+                MenuItem {
+                    title: "Standard 2-step ×40";
+                    activated => { root.load-protocol(0); }
+                }
+                MenuItem {
+                    title: "3-step ×40";
+                    activated => { root.load-protocol(1); }
+                }
+                MenuItem {
+                    title: "SYBR + melt";
+                    activated => { root.load-protocol(2); }
+                }
+            }
+            MenuSeparator {}
+            MenuItem {
+                title: "Simulate Acquisition";
+                enabled: !root.run-active;
+                activated => { root.request-simulate(); }
+            }
+            MenuItem {
+                title: "Abort Run";
+                enabled: root.run-active;
+                activated => { root.request-abort(); }
+            }
+            MenuSeparator {}
+            MenuItem {
+                title: "Edit Protocol…";
+                activated => { root.protocol-editor-open(); }
+            }
+        }
+        Menu {
+            title: "Help";
+            MenuItem {
+                title: "About openqpcr";
+                activated => { root.about-visible = true; }
+            }
+        }
+    }
+
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+        padding: 0;
+
+        // ===== Toolbar =====
+        Rectangle {
+            height: 28px;
+            background: Theme.menu-bg;
+            border-color: Theme.border;
+            border-width: 1px;
+            HorizontalLayout {
+                x: parent.width - self.preferred-width - 8px;
+                spacing: 10px;
+                padding-top: 2px;
+                padding-bottom: 2px;
+                Rectangle {
+                    width: 92px;
+                    background: Theme.toolbar-bg;
+                    border-color: Theme.border;
+                    border-width: 1px;
+                    border-radius: 2px;
+                    Text { text: "Plate Setup ▾"; font-size: Theme.font-size-small; vertical-alignment: center; horizontal-alignment: center; color: Theme.text; }
+                    TouchArea { clicked => { root.editor-open(); } }
+                }
+                Text { text: "Fluorophore:"; vertical-alignment: center; color: Theme.text; font-size: Theme.font-size-small; }
+                ComboBox {
+                    width: 128px;
+                    model: root.fluor-options;
+                    current-index <=> root.current-fluor-index;
+                    selected(value) => { root.fluor-selected(value); }
+                }
+            }
+        }
+
+        // ===== Tab strip =====
+        Rectangle {
+            height: 26px;
+            background: Theme.window-bg;
+            border-color: Theme.border;
+            border-width: 1px;
+            HorizontalLayout {
+                padding-left: 2px;
+                spacing: 1px;
+                alignment: start;
+                for name[i] in tab-names : Rectangle {
+                    width: 128px;
+                    background: i == root.current-tab ? Theme.panel-bg : Theme.window-bg;
+                    border-color: Theme.border;
+                    border-width: 1px;
+                    Text {
+                        text: name;
+                        font-size: Theme.font-size-small;
+                        font-weight: i == root.current-tab ? 700 : 400;
+                        color: Theme.text;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                    TouchArea {
+                        clicked => { root.current-tab = i; root.tab-selected(i); }
+                    }
+                }
+            }
+        }
+
+        // ===== Tab content =====
+        content := Rectangle {
+            background: Theme.window-bg;
+
+            // ---- Quantification ----
+            if root.current-tab == 0 : VerticalLayout {
+                padding: 4px;
+                spacing: 4px;
+
+                // upper: amplification + standard curve
+                HorizontalLayout {
+                    spacing: 4px;
+                    vertical-stretch: 55;
+                    VerticalLayout {
+                        horizontal-stretch: 62;
+                        LineChart {
+                            title: "Amplification";
+                            y-axis-title: "RFU";
+                            traces: root.amp-traces;
+                            x-labels: root.amp-x-labels;
+                            y-labels: root.amp-y-labels;
+                            threshold-pos: root.amp-threshold-pos;
+                            threshold-label: root.amp-threshold-label;
+                        }
+                        Rectangle {
+                            height: 24px;
+                            HorizontalLayout {
+                                padding-left: 40px;
+                                spacing: 16px;
+                                CheckBox {
+                                    text: "Log Scale";
+                                    checked: root.log-scale;
+                                    toggled => { root.toggle-log(self.checked); }
+                                }
+                                CheckBox {
+                                    text: "Stable Axes";
+                                    checked: root.stable-axes;
+                                    toggled => { root.toggle-stable-axes(self.checked); }
+                                }
+                            }
+                        }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 38;
+                        background: Theme.panel-bg;
+                        border-color: Theme.border;
+                        border-width: 1px;
+                        VerticalLayout {
+                            Rectangle {
+                                height: 22px;
+                                background: Theme.toolbar-bg;
+                                border-color: Theme.border;
+                                border-width: 1px;
+                                Text { text: "Standard Curve"; font-weight: 700; horizontal-alignment: center; vertical-alignment: center; color: Theme.text; }
+                            }
+                            LineChart {
+                                vertical-stretch: 1;
+                                y-axis-title: "Cq";
+                                traces: root.stdcurve-traces;
+                                x-labels: root.stdcurve-x-labels;
+                                y-labels: root.stdcurve-y-labels;
+                            }
+                            HorizontalLayout {
+                                padding: 8px;
+                                Text {
+                                    text: root.std-curve-text;
+                                    wrap: word-wrap;
+                                    color: Theme.text;
+                                    font-size: Theme.font-size-small;
+                                    horizontal-alignment: left;
+                                    vertical-alignment: top;
+                                }
+                            }
+                        }
+                    }
+                }
+                // lower: well selector + spreadsheet
+                HorizontalLayout {
+                    spacing: 4px;
+                    vertical-stretch: 45;
+                    PlateGrid {
+                        horizontal-stretch: 52;
+                        plate-rows: root.plate-rows;
+                        plate-cols: root.plate-cols;
+                        wells: root.wells;
+                        x-headers: root.plate-x-headers;
+                        y-headers: root.plate-y-headers;
+                        well-pressed(r, c) => { root.well-pressed(r, c); }
+                        well-dragged(r, c) => { root.well-dragged(r, c); }
+                        well-released() => { root.well-released(); }
+                    }
+                    DataTable {
+                        horizontal-stretch: 48;
+                        value-header: "Cq";
+                        rows: root.quant-rows;
+                        row-clicked(w) => { root.quant-row-clicked(w); }
+                    }
+                }
+            }
+
+            // ---- Melt Curve ----
+            if root.current-tab == 1 : VerticalLayout {
+                padding: 4px;
+                spacing: 4px;
+                HorizontalLayout {
+                    spacing: 4px;
+                    vertical-stretch: 55;
+                    LineChart {
+                        title: "Melt Curve";
+                        y-axis-title: "RFU";
+                        traces: root.melt-traces;
+                        x-labels: root.melt-x-labels;
+                        y-labels: root.melt-y-labels;
+                    }
+                    LineChart {
+                        title: "Melt Peak";
+                        y-axis-title: "-d(RFU)/dT";
+                        traces: root.peak-traces;
+                        x-labels: root.peak-x-labels;
+                        y-labels: root.peak-y-labels;
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 4px;
+                    vertical-stretch: 45;
+                    PlateGrid {
+                        horizontal-stretch: 52;
+                        plate-rows: root.plate-rows;
+                        plate-cols: root.plate-cols;
+                        wells: root.wells;
+                        x-headers: root.plate-x-headers;
+                        y-headers: root.plate-y-headers;
+                        well-pressed(r, c) => { root.well-pressed(r, c); }
+                        well-dragged(r, c) => { root.well-dragged(r, c); }
+                        well-released() => { root.well-released(); }
+                    }
+                    DataTable {
+                        horizontal-stretch: 48;
+                        value-header: "Melt Temp";
+                        rows: root.melt-rows;
+                        row-clicked(w) => { root.quant-row-clicked(w); }
+                    }
+                }
+            }
+
+            // ---- Run Information ----
+            if root.current-tab == 2 : VerticalLayout {
+                padding: 4px;
+                InfoTable { rows: root.info-rows; }
+            }
+
+            // ---- Gene Expression (ΔΔCq) ----
+            if root.current-tab == 3 : VerticalLayout {
+                padding: 4px;
+                spacing: 4px;
+                Rectangle {
+                    height: 22px;
+                    background: Theme.toolbar-bg;
+                    border-color: Theme.border;
+                    border-width: 1px;
+                    Text {
+                        text: root.gene-ref-label;
+                        font-weight: 700;
+                        font-size: Theme.font-size-small;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        color: Theme.text;
+                    }
+                }
+                DataTable {
+                    vertical-stretch: 1;
+                    value-header: "Rel Expr";
+                    rows: root.gene-rows;
+                    row-clicked(w) => { root.quant-row-clicked(w); }
+                }
+            }
+
+            // ---- Allelic Discrimination ----
+            if root.current-tab == 4 : VerticalLayout {
+                padding: 4px;
+                spacing: 4px;
+                HorizontalLayout {
+                    spacing: 4px;
+                    LineChart {
+                        horizontal-stretch: 60;
+                        title: "Allelic Discrimination (end-point RFU)";
+                        y-axis-title: root.allelic-y-title;
+                        traces: root.allelic-traces;
+                        x-labels: root.allelic-x-labels;
+                        y-labels: root.allelic-y-labels;
+                    }
+                    VerticalLayout {
+                        horizontal-stretch: 40;
+                        Rectangle {
+                            height: 22px;
+                            background: Theme.toolbar-bg;
+                            border-color: Theme.border;
+                            border-width: 1px;
+                            Text {
+                                text: root.allelic-label;
+                                font-weight: 700;
+                                font-size: Theme.font-size-small;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                color: Theme.text;
+                            }
+                        }
+                        DataTable {
+                            vertical-stretch: 1;
+                            value-header: "Y RFU";
+                            rows: root.allelic-rows;
+                            row-clicked(w) => { root.quant-row-clicked(w); }
+                        }
+                    }
+                }
+            }
+
+            // ---- QC ----
+            if root.current-tab == 5 : VerticalLayout {
+                padding: 4px;
+                InfoTable { rows: root.qc-rows; }
+            }
+        }
+
+        // ===== Status bar =====
+        Rectangle {
+            height: 22px;
+            background: Theme.toolbar-bg;
+            border-color: Theme.border;
+            border-width: 1px;
+            HorizontalLayout {
+                padding-left: 8px;
+                spacing: 18px;
+                Text { text: root.status-state; vertical-alignment: center; color: Theme.text; font-size: Theme.font-size-small; }
+                Text { text: "Scan Mode: " + root.status-scan-mode; vertical-alignment: center; color: Theme.text-muted; font-size: Theme.font-size-small; }
+                Text { text: "Plate Type: " + root.status-plate-type; vertical-alignment: center; color: Theme.text-muted; font-size: Theme.font-size-small; }
+                Text { text: "Analysis Mode: " + root.status-analysis-mode; vertical-alignment: center; color: Theme.text-muted; font-size: Theme.font-size-small; }
+            }
+        }
+    }
+
+    // ===== About dialog (modal overlay) =====
+    if root.about-visible : Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000066;
+        // Click anywhere outside the card to dismiss.
+        TouchArea { clicked => { root.about-visible = false; } }
+
+        Rectangle {
+            width: 380px;
+            height: 210px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: Theme.panel-bg;
+            border-color: Theme.border;
+            border-width: 1px;
+            border-radius: 4px;
+            // Swallow clicks on the card so they don't dismiss the dialog.
+            TouchArea {}
+
+            VerticalLayout {
+                padding: 20px;
+                spacing: 8px;
+                alignment: start;
+                Text { text: "openqpcr"; font-size: 20px; font-weight: 700; color: Theme.text; }
+                Text { text: "Version " + root.app-version; color: Theme.text-muted; font-size: Theme.font-size-small; }
+                Text {
+                    text: "Open reader and viewer for Bio-Rad CFX (Connect / Duet / Opus) real-time PCR data.";
+                    wrap: word-wrap;
+                    color: Theme.text;
+                    font-size: Theme.font-size-small;
+                }
+                Text { text: "MIT License"; color: Theme.text-muted; font-size: Theme.font-size-small; }
+                Rectangle { vertical-stretch: 1; }
+                HorizontalLayout {
+                    alignment: end;
+                    Rectangle {
+                        width: 76px;
+                        height: 26px;
+                        background: Theme.toolbar-bg;
+                        border-color: Theme.border;
+                        border-width: 1px;
+                        border-radius: 3px;
+                        Text { text: "Close"; horizontal-alignment: center; vertical-alignment: center; color: Theme.text; }
+                        TouchArea { clicked => { root.about-visible = false; } }
+                    }
+                }
+            }
+        }
+    }
+
+    // ===== Plate Editor (modal overlay) =====
+    if root.plate-editor-visible : Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000088;
+        TouchArea {} // swallow background clicks; dismissal is explicit via Close
+
+        Rectangle {
+            width: 940px;
+            height: 600px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: Theme.panel-bg;
+            border-color: Theme.border;
+            border-width: 1px;
+            border-radius: 4px;
+            TouchArea {}
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                HorizontalLayout {
+                    Text { text: "Plate Setup"; font-size: 16px; font-weight: 700; color: Theme.text; }
+                    Rectangle { horizontal-stretch: 1; }
+                    Text {
+                        text: root.edit-sel-count + " well(s) selected";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-small;
+                        vertical-alignment: center;
+                    }
+                }
+                HorizontalLayout {
+                    vertical-stretch: 1;
+                    spacing: 12px;
+                    PlateGrid {
+                        horizontal-stretch: 60;
+                        plate-rows: root.plate-rows;
+                        plate-cols: root.plate-cols;
+                        wells: root.wells;
+                        x-headers: root.plate-x-headers;
+                        y-headers: root.plate-y-headers;
+                        well-pressed(r, c) => { root.well-pressed(r, c); }
+                        well-dragged(r, c) => { root.well-dragged(r, c); }
+                        well-released() => { root.well-released(); }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 40;
+                        background: Theme.window-bg;
+                        border-color: Theme.border;
+                        border-width: 1px;
+                        VerticalLayout {
+                            padding: 10px;
+                            spacing: 8px;
+                            alignment: start;
+                            Text { text: "Sample Type"; color: Theme.text; font-size: Theme.font-size-small; }
+                            ComboBox {
+                                model: root.sample-type-names;
+                                current-index: root.edit-sample-type-index;
+                                selected(v) => { root.edit-apply-type(self.current-index); }
+                            }
+                            Text { text: "Sample Name"; color: Theme.text; font-size: Theme.font-size-small; }
+                            HorizontalLayout {
+                                spacing: 6px;
+                                name-edit := LineEdit {
+                                    text: root.edit-sample-name;
+                                    placeholder-text: "(name)";
+                                    accepted(t) => { root.edit-apply-name(t); }
+                                }
+                                Button {
+                                    text: "Set";
+                                    clicked => { root.edit-apply-name(name-edit.text); }
+                                }
+                            }
+                            Text { text: "Starting Quantity (standards)"; color: Theme.text; font-size: Theme.font-size-small; }
+                            HorizontalLayout {
+                                spacing: 6px;
+                                sq-edit := LineEdit {
+                                    text: root.edit-start-qty;
+                                    placeholder-text: "(e.g. 1e6)";
+                                    accepted(t) => { root.edit-apply-sq(t); }
+                                }
+                                Button {
+                                    text: "Set";
+                                    clicked => { root.edit-apply-sq(sq-edit.text); }
+                                }
+                            }
+                            Rectangle { height: 6px; }
+                            HorizontalLayout {
+                                spacing: 6px;
+                                Button { text: "Clear Wells"; clicked => { root.edit-clear(); } }
+                                Button { text: "Undo"; clicked => { root.editor-undo(); } }
+                            }
+                            Text {
+                                text: root.edit-status;
+                                color: Theme.text-muted;
+                                font-size: Theme.font-size-small;
+                                wrap: word-wrap;
+                            }
+                            Rectangle { vertical-stretch: 1; }
+                            HorizontalLayout {
+                                alignment: end;
+                                spacing: 6px;
+                                Button { text: "Save JSON"; clicked => { root.editor-save(); } }
+                                Button { text: "Close"; clicked => { root.editor-close(); } }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ===== Protocol Editor (modal overlay) =====
+    if root.protocol-editor-visible : Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000088;
+        TouchArea {} // swallow background clicks; dismissal is explicit via Close
+
+        Rectangle {
+            width: 760px;
+            height: 560px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: Theme.panel-bg;
+            border-color: Theme.border;
+            border-width: 1px;
+            border-radius: 4px;
+            TouchArea {}
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+
+                HorizontalLayout {
+                    Text { text: "Edit Thermal Protocol"; font-size: 16px; font-weight: 700; color: Theme.text; }
+                    Rectangle { horizontal-stretch: 1; }
+                    Text {
+                        text: root.protocol-rows.length + " step(s)";
+                        color: Theme.text-muted;
+                        font-size: Theme.font-size-small;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // Add-step toolbar.
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    Button { text: "+ Hold"; clicked => { root.protocol-add-hold(); } }
+                    Button { text: "+ Cycle ×40"; clicked => { root.protocol-add-cycle(); } }
+                    Button { text: "+ Melt"; clicked => { root.protocol-add-melt(); } }
+                }
+
+                // Column header.
+                Rectangle {
+                    height: 22px;
+                    background: Theme.toolbar-bg;
+                    border-color: Theme.border;
+                    border-width: 1px;
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 8px;
+                        Text { text: "#"; width: 28px; color: Theme.text; font-weight: 700; font-size: Theme.font-size-small; vertical-alignment: center; }
+                        Text { text: "Kind"; width: 84px; color: Theme.text; font-weight: 700; font-size: Theme.font-size-small; vertical-alignment: center; }
+                        Text { text: "Summary"; horizontal-stretch: 1; color: Theme.text; font-weight: 700; font-size: Theme.font-size-small; vertical-alignment: center; }
+                        Text { text: "Move / Remove"; width: 132px; color: Theme.text; font-weight: 700; font-size: Theme.font-size-small; horizontal-alignment: right; vertical-alignment: center; }
+                    }
+                }
+
+                // Step rows.
+                Rectangle {
+                    vertical-stretch: 1;
+                    background: Theme.window-bg;
+                    border-color: Theme.border;
+                    border-width: 1px;
+                    VerticalLayout {
+                        padding: 4px;
+                        spacing: 2px;
+                        alignment: start;
+                        for row[i] in root.protocol-rows : Rectangle {
+                            height: 28px;
+                            background: Theme.panel-bg;
+                            border-color: Theme.border;
+                            border-width: 1px;
+                            border-radius: 2px;
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 4px;
+                                spacing: 8px;
+                                Text { text: row.index + 1; width: 28px; color: Theme.text; font-size: Theme.font-size-small; vertical-alignment: center; }
+                                Text { text: row.kind; width: 84px; color: Theme.text; font-weight: 700; font-size: Theme.font-size-small; vertical-alignment: center; }
+                                Text { text: row.summary; horizontal-stretch: 1; color: Theme.text; font-size: Theme.font-size-small; vertical-alignment: center; overflow: elide; }
+                                Button { width: 40px; text: "▲"; clicked => { root.protocol-move(row.index, row.index - 1); } }
+                                Button { width: 40px; text: "▼"; clicked => { root.protocol-move(row.index, row.index + 1); } }
+                                Button { width: 40px; text: "✕"; clicked => { root.protocol-remove(row.index); } }
+                            }
+                        }
+                    }
+                }
+
+                Text {
+                    text: root.protocol-status;
+                    color: Theme.text-muted;
+                    font-size: Theme.font-size-small;
+                    wrap: word-wrap;
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 6px;
+                    Button { text: "Save"; clicked => { root.protocol-save(); } }
+                    Button { text: "Close"; clicked => { root.protocol-editor-close(); } }
+                }
+            }
+        }
+    }
+}

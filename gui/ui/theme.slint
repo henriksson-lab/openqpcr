@@ -1,0 +1,43 @@
+// Design tokens following OS/desktop conventions: neutral Windows-Forms grey
+// chrome and the standard selection-blue accent — no bespoke brand colour.
+// Saturated colour comes only from data (traces, sample-type well tints, the
+// threshold line). Independent project; does not use Bio-Rad's brand colours.
+
+export global Theme {
+    // Window chrome
+    out property <color> window-bg: #F0F0F0;
+    out property <color> panel-bg: #FFFFFF;
+    out property <color> toolbar-bg: #F3F3F3;
+    out property <color> menu-bg: #F5F5F5;
+    out property <color> border: #CFCFCF;
+    out property <color> splitter: #DCDCDC;
+    out property <color> table-header-bg: #E4E4E4;
+    out property <color> table-gridline: #E0E0E0;
+    out property <color> row-selected-bg: #CBE8F6;
+
+    // Text
+    out property <color> text: #1E1E1E;
+    out property <color> text-muted: #7A7A7A;
+
+    // Accents
+    out property <color> accent-selection: #0078D7;   // OS accent (Windows selection blue)
+
+    // Plots
+    out property <color> plot-bg: #FFFFFF;
+    out property <color> plot-axis: #303030;
+    out property <color> plot-grid: #DADADA;
+    out property <color> threshold: #008000;
+
+    // Sample-type well fills
+    out property <color> well-unknown: #DCEBF7;
+    out property <color> well-standard: #8FD98A;
+    out property <color> well-ntc: #F5D93B;
+    out property <color> well-control: #E9C9F0;
+    out property <color> well-empty: #F4F4F4;
+    out property <color> well-selected-border: #0078D7;
+
+    // Fonts
+    out property <length> font-size: 12px;
+    out property <length> font-size-small: 11px;
+    out property <string> font-family: "Segoe UI";
+}

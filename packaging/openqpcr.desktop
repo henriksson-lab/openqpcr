@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=openqpcr
+GenericName=qPCR data viewer
+Comment=Reader/viewer for Bio-Rad CFX (Connect / Duet / Opus) real-time PCR data
+Exec=openqpcr-gui %f
+Icon=openqpcr-gui
+Terminal=false
+Categories=Science;Biology;Education;
+Keywords=qpcr;pcr;real-time pcr;bio-rad;cfx;maestro;fluorescence;melt curve;Cq;Ct;
+MimeType=text/csv;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;
+# Must match the window's Wayland app_id / X11 WM_CLASS so the running window
+# associates with this launcher entry (and picks up its icon on Wayland).
+# Slint uses the binary name as the app_id by default.
+StartupWMClass=openqpcr-gui
