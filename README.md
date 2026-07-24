@@ -66,34 +66,24 @@ Screenshots below are rendered from the bundled synthetic 96-well demo run — a
 two-fluorophore (FAM / HEX) plate with a GAPDH standard curve, a GAPDH+IL6 gene
 expression panel, an SNP genotyping block, and controls:
 
-**Quantification** (with standard curve)
-
-![Quantification tab](docs/screenshots/demo_quant.png)
-
-**Melt Curve**
-
-![Melt Curve tab](docs/screenshots/demo_melt.png)
-
-**Gene Expression** (ΔΔCq relative quantification)
-
-![Gene Expression tab](docs/screenshots/demo_gene.png)
-
-**Allelic Discrimination** (end-point genotyping)
-
-![Allelic Discrimination tab](docs/screenshots/demo_allelic.png)
-
-**QC**
-
-![QC tab](docs/screenshots/demo_qc.png)
-
-**Run Information**
-
-![Run Information tab](docs/screenshots/demo_runinfo.png)
-
-**Plate Setup** — copying a plate layout from another run onto the current plate
-(status bar reports wells copied / skipped)
-
-![Plate Setup — copy layout](docs/screenshots/demo_copy_layout.png)
+<table>
+  <tr>
+    <td width="50%"><b>Quantification</b> (with standard curve)<br><img src="docs/screenshots/demo_quant.png" alt="Quantification tab" width="100%"></td>
+    <td width="50%"><b>Melt Curve</b><br><img src="docs/screenshots/demo_melt.png" alt="Melt Curve tab" width="100%"></td>
+  </tr>
+  <tr>
+    <td><b>Gene Expression</b> (ΔΔCq relative quantification)<br><img src="docs/screenshots/demo_gene.png" alt="Gene Expression tab" width="100%"></td>
+    <td><b>Allelic Discrimination</b> (end-point genotyping)<br><img src="docs/screenshots/demo_allelic.png" alt="Allelic Discrimination tab" width="100%"></td>
+  </tr>
+  <tr>
+    <td><b>QC</b><br><img src="docs/screenshots/demo_qc.png" alt="QC tab" width="100%"></td>
+    <td><b>Run Information</b><br><img src="docs/screenshots/demo_runinfo.png" alt="Run Information tab" width="100%"></td>
+  </tr>
+  <tr>
+    <td><b>Plate Setup</b> — copy layout (wells copied / skipped)<br><img src="docs/screenshots/demo_copy_layout.png" alt="Plate Setup — copy layout" width="100%"></td>
+    <td></td>
+  </tr>
+</table>
 
 ```sh
 cargo run -p openqpcr-gui -- path/to/export_dir/     # or a .xlsx export
@@ -117,8 +107,6 @@ run/acquisition/analysis pipeline testable without a device: `SimulatedInstrumen
 synthesizes curves from each well's sample type (with optional fault injection —
 mid-run errors, dead wells), and `ReplayInstrument` streams a *recorded* run (e.g. a
 decoded `.pcrd`) back cycle-by-cycle as if acquiring live. Replaying a run in the GUI:
-
-![Replay of a recorded .pcrd](docs/screenshots/demo_replay.png)
 
 `examples/gen_demo_export.py` regenerates the synthetic 96-well demo dataset in
 `examples/demo_export/`.
